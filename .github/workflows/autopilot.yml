@@ -61,15 +61,18 @@ jobs:
       CLIP_ORIGINAL_AUDIO: ${{ vars.CLIP_ORIGINAL_AUDIO }}
       CLIP_MAX_SECONDS: ${{ vars.CLIP_MAX_SECONDS }}
       GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
-      MAX_VIDEOS_PER_DAY: "4"
-      AUTO_PICK_COUNT: "4"
+      MAX_VIDEOS_PER_DAY: ${{ vars.MAX_VIDEOS_PER_DAY || '2' }}
+      AUTO_PICK_COUNT: ${{ vars.AUTO_PICK_COUNT || '1' }}
       SELECT_TIMEOUT_HOURS: ${{ vars.SELECT_TIMEOUT_HOURS }}
       REQUIRE_APPROVAL: ${{ vars.REQUIRE_APPROVAL }}
       APPROVE_TIMEOUT_HOURS: ${{ vars.APPROVE_TIMEOUT_HOURS }}
       YT_PRIVACY: ${{ vars.YT_PRIVACY }}
       TIKTOK_PRIVACY: ${{ vars.TIKTOK_PRIVACY }}
       TIKTOK_MODE: ${{ vars.TIKTOK_MODE }}
-      TARGET_SECONDS: "60"
+      TARGET_SECONDS: ${{ vars.TARGET_SECONDS || '30' }}
+      STORE_URL: ${{ vars.STORE_URL }}
+      PLAN_ONLY: ${{ vars.PLAN_ONLY }}
+      PRODUCT_SHOT_EVERY: ${{ vars.PRODUCT_SHOT_EVERY }}
       FACT_CHECK: ${{ vars.FACT_CHECK }}
       POLL_MINUTES: ${{ vars.POLL_MINUTES }}
       SCHEDULE_PUBLISH: ${{ vars.SCHEDULE_PUBLISH }}
@@ -101,6 +104,9 @@ jobs:
 
       - name: Run
         run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$GEMINI_API_KEY" ]; then
+            echo "Setup not finished: add TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID and GEMINI_API_KEY secrets (see README). Skipping."; exit 0
+          fi
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then CMD="${{ inputs.command }}";
           elif [ "${{ github.event.schedule }}" = "17 14 * * *" ]; then CMD=trends;
           else CMD=poll; fi
