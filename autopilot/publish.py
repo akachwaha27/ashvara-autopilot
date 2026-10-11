@@ -1,5 +1,6 @@
 """Upload to YouTube, Instagram and TikTok via their official free APIs."""
 import os
+import re
 import time
 
 import requests
@@ -158,8 +159,29 @@ def facebook(path, caption, title=""):
 
 
 # ---------------- Captions per platform ----------------
+SHOP_RE = re.compile(r"Shop it: (https?://\S+)")
+
+
+def tagged_url(url, platform):
+    """Store link with UTM tags so Shopify reports which platform each visit and sale came from."""
+    if not url or config.STORE_URL.split("//")[-1] not in url:
+        return url
+    medium = "video" if platform == "youtube" else "social"
+    sep = "&" if "?" in url else "?"
+    return f"{url}{sep}utm_source={platform}&utm_medium={medium}&utm_campaign=ashvara-videos"
+
+
+def tag_links(text, platform):
+    return SHOP_RE.sub(lambda m: f"Shop it: {tagged_url(m.group(1), platform)}", text or "")
+
+
 def social_caption(title, description, hashtags, platform):
-    """Short caption: title, the hook paragraph, credits/disclosure (required by the footage licenses), hashtags."""
+    """Short caption: title, the hook paragraph, shop link, credits/disclosure (required by the footage licenses), hashtags."""
+    m = SHOP_RE.search(description or "")
+    shop = f"\n\nShop it: {tagged_url(m.group(1), platform)}" if m else ""
+    if m and platform == "instagram":
+        shop += "\n(Link in bio)"
+    description = SHOP_RE.sub("", description or "")
     body, _, credits = description.partition("— Credits & disclosure —")
     first = next((p.strip() for p in body.split("\n\n") if p.strip() and not p.strip().startswith("#")), "")
     tags = [h if h.startswith("#") else f"#{h}" for h in hashtags]
@@ -174,10 +196,10 @@ def social_caption(title, description, hashtags, platform):
     limit = 2150
     tail = "\n\nCredits & AI disclosure:\n" + "\n".join(credit_lines) if credit_lines else ""
     tag_line = "\n\n" + " ".join(tags)
-    room = limit - len(title) - len(tail) - len(tag_line) - 4
+    room = limit - len(title) - len(shop) - len(tail) - len(tag_line) - 4
     if len(first) > room:
         first = first[:max(room - 1, 0)].rstrip() + "…"
-    return f"{title}\n\n{first}{tail}{tag_line}"[:limit]
+    return f"{title}\n\n{first}{shop}{tail}{tag_line}"[:limit]
 
 
 # ---------------- TikTok ----------------
@@ -244,7 +266,7 @@ def publish_all(path, title, description, hashtags, tags=(), category="24", thum
                 publish_at=None):
     cap = {p: social_caption(title, description, hashtags, p) for p in ("instagram", "facebook", "tiktok")}
     results = {}
-    for name, fn in (("YouTube", lambda: youtube(path, title, description, list(tags) or [h.lstrip("#") for h in hashtags], category, thumb, srt, comment, publish_at)),
+    for name, fn in (("YouTube", lambda: youtube(path, title, tag_links(description, "youtube"), list(tags) or [h.lstrip("#") for h in hashtags], category, thumb, srt, comment, publish_at)),
                      ("Instagram", lambda: instagram(path, cap["instagram"])),
                      ("Facebook", lambda: facebook(path, cap["facebook"], title)),
                      ("TikTok", lambda: tiktok(path, cap["tiktok"]))):
